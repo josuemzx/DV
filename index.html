@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Para Valery 💌</title>
+<link rel="icon" href="img/heart.png">
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;700&family=Dancing+Script:wght@600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg1:#f8f3ff; --bg2:#f2eaff;
+    --ink:#222; --muted:#6b6b6b;
+    --env-1:#ff7a6e; --env-2:#ff9b8f; --env-3:#e25050;
+    --paper:#fff; --accent:#ff5b92;
+    --shadow:0 20px 50px rgba(0,0,0,.14);
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    margin:0; color:var(--ink); font-family:Outfit,system-ui,-apple-system,Segoe UI,Roboto,Arial;
+    background:
+      radial-gradient(1200px 800px at 10% 10%, #ffffff 0%, transparent 40%),
+      radial-gradient(1200px 800px at 90% 90%, #ffffff 0%, transparent 40%),
+      linear-gradient(180deg,var(--bg1) 0%, var(--bg2) 55%, #fbf9ff 100%);
+  }
+  .wrap{min-height:100%; display:grid; grid-template-rows:auto 1fr auto; gap:8px; padding:18px 12px 24px;}
+  header{ text-align:center; }
+  h1{ margin:6px 0 0; font-size:clamp(22px,4.2vw,34px) }
+  .subtitle{ margin:4px 0 0; color:var(--muted); font-size:clamp(12px,2.8vw,15px) }
+
+  /* Escenario ajustado a viewport */
+  .stage{
+    place-self:center;
+    width:min(92vw, 760px);                 /* ↑ un poco más ancho */
+    height:min(68vh, 560px);                /* ↑ un poco más alto */
+    display:grid; place-items:center; position:relative; perspective:1400px;
+  }
+
+  /* Sombra elíptica del piso */
+  .ground{
+    position:absolute; bottom:10px; left:50%;
+    width:70%; height:24px; transform:translateX(-50%);
+    background:radial-gradient(ellipse at center, rgba(0,0,0,.26), rgba(0,0,0,0) 70%);
+    filter:blur(10px); opacity:.34; pointer-events:none;
+    transition:opacity .6s ease, transform .6s ease;
+  }
+  .envelope.open ~ .ground{ opacity:.46; transform:translateX(-50%) scale(1.06); }
+
+  /* SOBRE */
+  .envelope{
+    position:relative;
+    width: min(88vw, 700px);                     /* ↑ sobre más grande */
+    height: calc(min(88vw, 700px) * 0.72);       /* proporción agradable */
+    max-height: calc(100% - 26px);               /* respeta la stage */
+    transform-style:preserve-3d;
+    filter:drop-shadow(var(--shadow));
+    transition:transform .8s cubic-bezier(.2,.8,.2,1);
+  }
+  .envelope.open{ transform: translateY(-6px) scale(1.012); }
+
+  .pocket, .flap, .letter{ border-radius:16px; }
+
+  .pocket{
+    position:absolute; inset:0; overflow:hidden; z-index:1;
+    background:linear-gradient(180deg,var(--env-2),var(--env-1));
+  }
+  .pocket::after{
+    content:""; position:absolute; inset:auto 0 0 0; height:72%;
+    background:conic-gradient(from 45deg,var(--env-1) 0 25%,var(--env-3) 0 75%,var(--env-1) 0);
+    clip-path:polygon(0 100%, 50% 44%, 100% 100%);
+  }
+
+  .flap{
+    position:absolute; inset:0; z-index:3; transform-origin:50% 26%;
+    transition:transform .9s cubic-bezier(.2,.8,.2,1), z-index .9s;
+  }
+  .flap::before{
+    content:""; position:absolute; inset:0;
+    background:linear-gradient(180deg,var(--env-3),#c94545 85%);
+    clip-path:polygon(0 0, 100% 0, 50% 62%);
+    border-radius:16px 16px 10px 10px;
+  }
+  .envelope.open .flap{ transform:rotateX(162deg) translateZ(1px); z-index:0; }
+
+  /* Máscara: oculta carta y contenido mientras está cerrada */
+  .mask{
+    position:absolute; inset:12% 6% 8% 6%;
+    overflow:hidden; border-radius:10px; z-index:2; pointer-events:none;
+    /* refuerzo visual: */
+    box-shadow: inset 0 0 0 1px rgba(0,0,0,.05);
+    background: transparent;
+  }
+
+  /* CARTA */
+  .letter{
+    position:absolute; left:6%; right:6%; bottom:10%;
+    height:72%; background:var(--paper);
+    box-shadow:0 10px 26px rgba(0,0,0,.16);
+    transform: translateY(60%);  /* OCULTA MÁS ADENTRO */
+    padding:18px 20px 20px; display:flex; flex-direction:column; gap:8px;
+    z-index:2; opacity:0; transition:transform 1s cubic-bezier(.2,.8,.2,1), opacity .5s ease;
+  }
+  /* Apertura estándar */
+  .envelope.open .letter{ transform: translateY(-40%); opacity:1; }
+  /* Si la carta es muy larga, asoma un poco más arriba */
+  .envelope.open.tall .letter{ transform: translateY(-58%); }
+
+  .heading{ font-family:"Dancing Script", cursive; font-size:clamp(21px,4.4vw,28px); color:#b14242; margin:2px 0 6px; }
+  .body{ line-height:1.68; font-size:clamp(14px,3.1vw,17px); }
+  .body p{ margin:0 0 10px; }
+  .footer{ margin-top:auto; text-align:right; font-weight:700; opacity:0; transform:translateY(8px); transition:opacity .6s ease, transform .6s ease; }
+  .footer.show{ opacity:1; transform:translateY(0); }
+
+  /* Scroll solo cuando está abierta y la carta es larga */
+  .envelope.open .letter{ max-height:none; overflow:auto; }
+  .letter::-webkit-scrollbar{ width:8px }
+  .letter::-webkit-scrollbar-thumb{ background:#eadfff; border-radius:10px }
+
+  /* CORAZONES — un poquito más grandes */
+  .hearts{ pointer-events:none; position:absolute; inset:0; overflow:visible; }
+  .heart{
+    position:absolute; width:30px; height:30px;              /* ↑ tamaño */
+    transform:translate(-50%,-50%) scale(0);
+    animation:floatUp 3.2s ease-in forwards;
+    filter:drop-shadow(0 6px 12px rgba(255,0,120,.22));
+    background:var(--accent);
+    clip-path:path("M14 22 C 12 19, 2 14, 2 7 a 6 6 0 0 1 11 -2 a 6 6 0 0 1 11 2 c 0 7 -10 12 -12 15 z");
+    opacity:.9;
+  }
+  @keyframes floatUp{
+    0%{ opacity:.0; transform:translate(var(--x),var(--y)) scale(.26); }
+    14%{ opacity:1; }
+    100%{ opacity:0; transform:translate(calc(var(--x) + var(--dx)), calc(var(--y) - 200px)) scale(1.12); }
+  }
+
+  /* CONTROLES */
+  .controls{ place-self:center; display:flex; gap:10px; flex-wrap:wrap; justify-content:center; }
+  .btn{
+    border:none; cursor:pointer; padding:10px 16px; border-radius:12px;
+    background:var(--env-1); color:#fff; font-weight:700; letter-spacing:.3px;
+    box-shadow:0 8px 22px rgba(255,105,105,.32);
+    transition:transform .1s ease, box-shadow .2s ease;
+    font-size:15px;
+  }
+  .btn.secondary{ background:transparent; color:var(--env-3); border:2px solid var(--env-3); box-shadow:none; }
+  .btn:active{ transform:translateY(1px) scale(.99); }
+  .btn:hover{ box-shadow:0 10px 26px rgba(255,105,105,.42); }
+  .note{ text-align:center; color:var(--muted); font-size:12px; margin-top:6px; }
+
+  /* PRINT */
+  @media print{
+    body{ background:#fff; }
+    header,.controls,.note{ display:none !important; }
+    .stage{ width:100%; height:auto; }
+    .envelope{ filter:none !important; transform:none !important; }
+    .flap{ transform:rotateX(162deg) !important; }
+    .letter{ transform:translateY(-10%) !important; height:auto; box-shadow:none; opacity:1 !important; }
+    .ground{ display:none !important; }
+  }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>Para Valery 💗</h1>
+      <p class="subtitle">Haz clic en “Abrir” para leer tu carta</p>
+    </header>
+
+    <div class="stage">
+      <div class="envelope" id="envelope" aria-live="polite">
+        <div class="pocket"></div>
+        <div class="flap"></div>
+        <div class="mask" aria-hidden="true"></div>
+
+        <article class="letter" id="letter">
+          <div class="heading">Mi hijita hermosa,</div>
+          <div class="body" id="letter-body"></div>
+          <div class="footer" id="letter-footer">Con todo mi amor,<br><strong>Papá</strong></div>
+        </article>
+
+        <div class="hearts" id="hearts"></div>
+      </div>
+      <div class="ground"></div>
+    </div>
+
+    <div class="controls">
+      <button class="btn" id="btn-open">Abrir</button>
+      <button class="btn secondary" id="btn-close">Cerrar</button>
+      <button class="btn secondary" id="btn-skip">Saltar escritura</button>
+      <button class="btn secondary" id="btn-print">Imprimir / Guardar PDF</button>
+      <button class="btn secondary" id="btn-share">Compartir</button>
+      <button class="btn secondary" id="btn-music">🎵 Música</button>
+    </div>
+    <div class="note"></div>
+  </div>
+
+  <audio id="bgm" src="piano.mp3" preload="auto" loop></audio>
+
+<script>
+/* ======= Texto ======= */
+const PARS = [
+  "Quise escribirte con calma, porque hay cosas que uno siente muy dentro y no caben en una llamada.",
+  "Lo primero que quiero decirte es cuánto te amo. Eres lo mejor que me ha pasado en la vida. Eres mi primera hija, la que me enseñó lo que significa ser papá, la que me dio la felicidad más grande desde el primer día en que llegaste. Ese lugar tuyo en mi corazón es único y nadie lo ocupará jamás.",
+  "Aunque estemos en ciudades distintas, nunca estás lejos de mí. Cada logro tuyo me llena de orgullo; verte crecer y esforzarte es mi alegría más grande.",
+  "Hemos tenido diferencias, como es natural, pero nada borra lo que siento por ti. Todo lo que alguna vez soñé para ti nació del deseo de verte feliz. Mi amor por ti es incondicional y eterno.",
+  "Y ahora quiero contarte algo muy especial, algo que me emociona en lo más profundo. Es una noticia que llena mi corazón de ilusión y que también tiene mucho que ver contigo. Porque después de tantos años en que has sido mi única hija… muy pronto ya no estarás sola: llegará una nueva vida a nuestra familia, y tendrás a alguien más con quien compartir. Me llena de emoción imaginarte como hermana mayor. Pienso en cómo esta nueva personita, que ya lleva 3 meses creciendo y latiendo fuerte en la pancita de Karina, llegará al mundo teniendo en ti un ejemplo a seguir. Aprenderá de tu fortaleza, de tu ternura y de tu forma de ver la vida. Sé que lo vas a cuidar, que lo vas a querer y que vas a ser para esa personita ese refugio especial que solo una hermana puede dar.",
+  "Sueño con verlos abrazarse, con verte guiar sus primeros pasos, con ver cómo se miran y se entienden sin palabras, como solo los hermanos saben hacerlo. Sueño con que se amen, que se cuiden, que se acompañen en la vida.",
+  "Nadie, absolutamente nadie, ocupará tu lugar. Tú eres única; la que me regaló la primera y más grande experiencia de ser papá. Esta nueva etapa viene a multiplicar el amor en nuestras vidas, nunca a restarlo.",
+  "Ojalá recibas esta noticia con la misma alegría con la que te la cuento. Para mí, para la familia y también para ti, esto es un regalo.",
+  "Te amo con todo lo que soy. Pase lo que pase, aunque la vida nos ponga kilómetros de distancia, siempre voy a estar aquí para ti —cuidándote, apoyándote y amándote con todo mi corazón."
+];
+
+/* ======= Refs ======= */
+const env = document.getElementById('envelope');
+const hearts = document.getElementById('hearts');
+const bodyEl = document.getElementById('letter-body');
+const footerEl = document.getElementById('letter-footer');
+const audio = document.getElementById('bgm');
+
+const btnOpen  = document.getElementById('btn-open');
+const btnClose = document.getElementById('btn-close');
+const btnSkip  = document.getElementById('btn-skip');
+const btnPrint = document.getElementById('btn-print');
+const btnShare = document.getElementById('btn-share');
+const btnMusic = document.getElementById('btn-music');
+
+/* ======= Estados escritura ======= */
+let typing = {timer:null, p:0, c:0, active:false};
+const BASE_SPEED = 46; // más lento y calmado
+
+/* ======= Botones ======= */
+btnOpen.addEventListener('click', openEnv);
+btnClose.addEventListener('click', closeEnv);
+btnSkip.addEventListener('click', showAll);
+btnPrint.addEventListener('click', ()=>window.print());
+btnShare.addEventListener('click', async ()=>{
+  const data={title:"Para Valery 💗", text:"Te escribí algo con mucho amor.", url:location.href};
+  if(navigator.share){ try{ await navigator.share(data);}catch{} } else { alert("Copia el enlace de la barra del navegador para compartir ❤️"); }
+});
+btnMusic.addEventListener('click', async ()=>{
+  try{
+    if(audio.paused){ await fadeIn(audio); btnMusic.textContent="⏸️ Música"; }
+    else{ await fadeOut(audio); btnMusic.textContent="🎵 Música"; }
+  }catch{}
+});
+
+/* Teclado */
+document.addEventListener('keydown', e=>{
+  if(e.key==='Enter' || e.key===' '){
+    if(!env.classList.contains('open')) openEnv();
+    else closeEnv();
+  }
+});
+
+/* ======= Funciones ======= */
+function openEnv(){
+  env.classList.add('open');
+  // Si la carta es larga, que asome más (añade clase .tall)
+  requestAnimationFrame(()=> assessTall());
+  startTyping();
+  burstHearts();
+  fadeIn(audio).then(()=> btnMusic.textContent="⏸️ Música").catch(()=>{});
+}
+async function closeEnv(){
+  env.classList.remove('open','tall');
+  clearHearts();
+  await fadeOut(audio);
+  btnMusic.textContent="🎵 Música";
+  stopTyping(true);
+  footerEl.classList.remove('show');
+  document.getElementById('letter').scrollTop = 0;
+}
+
+/* Detecta si la carta necesita asomar más */
+function assessTall(){
+  const mask = document.querySelector('.mask');
+  const letter = document.getElementById('letter');
+  const slotH = mask.getBoundingClientRect().height;
+  const contentH = letter.scrollHeight;
+  // margen del 20% para activar el modo "tall"
+  const needs = contentH > slotH * 1.2;
+  env.classList.toggle('tall', needs);
+}
+
+/* Música con fundido */
+function fadeIn(aud, dur=800){
+  aud.volume=0; aud.play().catch(()=>{});
+  return new Promise(res=>{
+    const t0=performance.now();
+    (function step(t){
+      const k=Math.min(1,(t-t0)/dur);
+      aud.volume = 0.0 + k*0.7; // volumen final moderado
+      if(k<1) requestAnimationFrame(step); else res();
+    })(t0);
+  });
+}
+function fadeOut(aud, dur=600){
+  return new Promise(res=>{
+    const v0 = aud.volume || 0.7;
+    const t0=performance.now();
+    (function step(t){
+      const k=Math.min(1,(t-t0)/dur);
+      aud.volume = Math.max(0, v0*(1-k));
+      if(k<1) requestAnimationFrame(step); else { aud.pause(); aud.currentTime=0; res(); }
+    })(t0);
+  });
+}
+
+/* Corazones */
+function burstHearts(){
+  clearHearts();
+  const rect = env.getBoundingClientRect();
+  const cx = rect.width/2, y = rect.height*0.58;
+  for(let i=0;i<14;i++){
+    const h=document.createElement('div'); h.className='heart';
+    const ang=(Math.random()*Math.PI)-(Math.PI/2);
+    const rad=44+Math.random()*36; // levemente mayor recorrido
+    const x=cx+(Math.cos(ang)*18)+(Math.random()*10-5);
+    const dx=Math.cos(ang)*rad*(0.7+Math.random()*0.6);
+    h.style.setProperty('--x', x+'px');
+    h.style.setProperty('--y', y+'px');
+    h.style.setProperty('--dx', dx+'px');
+    h.style.animationDelay=(Math.random()*0.25)+'s';
+    hearts.appendChild(h);
+    setTimeout(()=>h.remove(), 3400);
+  }
+}
+function clearHearts(){ hearts.innerHTML=""; }
+
+/* Escritura calmada */
+function startTyping(){
+  stopTyping(true);
+  typing.active=true;
+  typeTick();
+}
+function stopTyping(reset=false){
+  typing.active=false; clearTimeout(typing.timer);
+  if(reset){ bodyEl.innerHTML=''; typing.p=0; typing.c=0; }
+}
+function typeTick(){
+  if(!typing.active) return;
+
+  // crear nuevo párrafo si hace falta
+  if(!bodyEl.lastElementChild || bodyEl.lastElementChild.dataset.done==='1'){
+    if(typing.p >= PARS.length){ typing.active=false; footerEl.classList.add('show'); return; }
+    const p=document.createElement('p'); p.dataset.done='0'; p.innerHTML=''; bodyEl.appendChild(p); typing.c=0;
+  }
+  const p=bodyEl.lastElementChild, text=PARS[typing.p];
+
+  const ch = text.charAt(typing.c++);
+  p.innerHTML += ch;
+
+  // velocidad base y pausas suaves en puntuación
+  let delay = 46;
+  if([',',';','—'].includes(ch)) delay = 220;
+  if(['.','!','?'].includes(ch)) delay = 360;
+
+  if(typing.c >= text.length){
+    p.dataset.done='1'; typing.p++; typing.c=0;
+    delay = 600; // pausa entre párrafos
+  }
+  typing.timer = setTimeout(typeTick, delay);
+}
+
+/* Saltar escritura -> muestra todo y firma */
+function showAll(){
+  stopTyping(true);
+  bodyEl.innerHTML = PARS.map(t=>`<p>${t}</p>`).join('');
+  footerEl.classList.add('show');
+  // Revalida si debe asomar más
+  requestAnimationFrame(()=> assessTall());
+}
+</script>
+</body>
+</html>
