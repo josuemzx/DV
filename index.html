@@ -110,6 +110,13 @@
     .footer{ margin-top:auto; text-align:right; font-weight:700; opacity:0; transform:translateY(8px); transition:opacity .6s ease, transform .6s ease; }
     .footer.show{ opacity:1; transform:translateY(0); }
 
+    /* botón sorpresa dentro de la carta */
+    .surprise-btn{
+      display:inline-block; margin-top:10px; font-weight:700;
+      background:#7c5cff; color:#fff; padding:10px 14px; border-radius:12px;
+      text-decoration:none; box-shadow:0 8px 20px rgba(124,92,255,.25);
+    }
+
     .envelope.open .letter{ max-height:none; overflow:auto; }
     .letter::-webkit-scrollbar{ width:8px }
     .letter::-webkit-scrollbar-thumb{ background:#eadfff; border-radius:10px }
@@ -143,7 +150,11 @@
     .btn.secondary{ background:transparent; color:var(--env-3); border:2px solid var(--env-3); box-shadow:none; }
     .btn:active{ transform:translateY(1px) scale(.99); }
     .btn:hover{ box-shadow:0 10px 26px rgba(255,105,105,.42); }
-    .note{ text-align:center; color:var(--muted); font-size:12px; margin-top:6px; }
+    .note{ text-align:center; color:var(--muted); font-size:12px; margin-top:6px; min-height:16px; }
+
+    /* botón sorpresa en controles (sutil) */
+    #btn-surprise-main{ display:none; opacity:.75 }
+    #btn-surprise-main:hover{ opacity:1 }
 
     /* ===== Área plana solo para impresión ===== */
     #print-root{
@@ -163,12 +174,9 @@
     @media print{
       html, body{ height:auto !important; background:#fff !important; }
       header,.controls,.note{ display:none !important; }
-
-      /* Ocultamos la escena 3D y mostramos solo el plano de impresión */
       .stage{ display:none !important; }
       #print-root{ display:block !important; }
-
-      /* Fidelidad de color */
+      .surprise-btn{ display:none !important; }
       body{
         -webkit-print-color-adjust: exact;
         print-color-adjust: exact;
@@ -192,7 +200,13 @@
         <article class="letter" id="letter">
           <div class="heading">Mi hijita hermosa,</div>
           <div class="body" id="letter-body"></div>
-          <div class="footer" id="letter-footer">Con todo mi amor,<br><strong>Papá</strong></div>
+          <div class="footer" id="letter-footer">
+            Con todo mi amor,<br><strong>Papá</strong>
+            <!-- botón sorpresa dentro de la carta (aparece al terminar) -->
+            <div id="footer-surprise" style="display:none; margin-top:12px;">
+              <a href="sorpresa.html" class="surprise-btn">🎁 Sorpresa: entra a ver la foto de tu hermanit@</a>
+            </div>
+          </div>
         </article>
 
         <div class="hearts" id="hearts"></div>
@@ -206,8 +220,10 @@
       <button class="btn secondary" id="btn-skip">Saltar escritura</button>
       <button class="btn secondary" id="btn-print">Imprimir / Guardar PDF</button>
       <button class="btn secondary" id="btn-music">🎵 Música</button>
+      <!-- botón sorpresa sutil en la zona de controles -->
+      <a id="btn-surprise-main" class="btn secondary" href="sorpresa.html">🎁 Sorpresa</a>
     </div>
-    <div class="note"></div>
+    <div class="note" id="note"></div>
 
     <!-- Contenedor PLANO para impresión -->
     <div id="print-root" aria-hidden="true"></div>
@@ -234,44 +250,59 @@
     const hearts = document.getElementById('hearts');
     const bodyEl = document.getElementById('letter-body');
     const footerEl = document.getElementById('letter-footer');
+    const footerSurprise = document.getElementById('footer-surprise');
     const audio = document.getElementById('bgm');
 
     const btnOpen  = document.getElementById('btn-open');
     const btnClose = document.getElementById('btn-close');
     const btnSkip  = document.getElementById('btn-skip');
     const btnPrint = document.getElementById('btn-print');
-    const btnShare = document.getElementById('btn-share');
     const btnMusic = document.getElementById('btn-music');
-
+    const btnSurpriseMain = document.getElementById('btn-surprise-main');
+    const noteEl = document.getElementById('note');
     const printRoot = document.getElementById('print-root');
 
     /* ======= Estados escritura ======= */
     let typing = {timer:null, p:0, c:0, active:false};
     const BASE_SPEED = 46;
 
+    /* ======= Desbloqueo de audio para GitHub Pages / móviles =======
+       Política de autoplay: reproducir solo tras un gesto del usuario.
+       Este bloque asegura un "unlock" fiable en el PRIMER gesto. */
+    let audioUnlocked = false;
+    function unlockAudioOnce(){
+      if(audioUnlocked) return;
+      audio.play().then(()=>{
+        audio.pause(); audio.currentTime = 0;
+        audioUnlocked = true;
+      }).catch(()=>{/* si falla, lo volveremos a intentar en el próximo gesto */});
+    }
+    ['pointerdown','touchstart','keydown'].forEach(evt=>{
+      window.addEventListener(evt, unlockAudioOnce, { once:false, passive:true });
+    });
+
     /* ======= Botones ======= */
     btnOpen.addEventListener('click', openEnv);
     btnClose.addEventListener('click', closeEnv);
     btnSkip.addEventListener('click', showAll);
 
-    // Preparar contenido plano y abrir diálogo de impresión
     btnPrint.addEventListener('click', ()=>{
       prepareForPrint();
-      // pequeña espera para asegurar reflow antes de abrir preview
       setTimeout(()=>window.print(), 120);
-    });
-
-    btnShare.addEventListener('click', async ()=>{
-      const data={title:"Para Valery 💗", text:"Te escribí algo con mucho amor.", url:location.href};
-      if(navigator.share){ try{ await navigator.share(data);}catch{} }
-      else { alert("Copia el enlace de la barra del navegador para compartir ❤️"); }
     });
 
     btnMusic.addEventListener('click', async ()=>{
       try{
-        if(audio.paused){ await fadeIn(audio); btnMusic.textContent="⏸️ Música"; }
-        else{ await fadeOut(audio); btnMusic.textContent="🎵 Música"; }
-      }catch{}
+        if(audio.paused){
+          await fadeIn(audio);
+          btnMusic.textContent = "⏸️ Música";
+        }else{
+          await fadeOut(audio);
+          btnMusic.textContent = "🎵 Música";
+        }
+      }catch(e){
+        noteEl.textContent = "Toca “Abrir” o la pantalla para habilitar el audio.";
+      }
     });
 
     /* Teclado */
@@ -291,8 +322,15 @@
       requestAnimationFrame(()=> assessTall());
       startTyping();
       burstHearts();
-      fadeIn(audio).then(()=> btnMusic.textContent="⏸️ Música").catch(()=>{});
+      // iniciar música tras la interacción de clic (cumple política)
+      fadeIn(audio).then(()=>{
+        btnMusic.textContent="⏸️ Música";
+        noteEl.textContent="";
+      }).catch(()=>{
+        noteEl.textContent = "Si no se escucha, toca de nuevo para habilitar el audio.";
+      });
     }
+
     async function closeEnv(){
       env.classList.remove('open','tall');
       clearHearts();
@@ -300,6 +338,8 @@
       btnMusic.textContent="🎵 Música";
       stopTyping(true);
       footerEl.classList.remove('show');
+      footerSurprise.style.display = "none";
+      btnSurpriseMain.style.display = "none";
       document.getElementById('letter').scrollTop = 0;
     }
 
@@ -313,14 +353,17 @@
     }
 
     function fadeIn(aud, dur=800){
-      aud.volume=0; aud.play().catch(()=>{});
-      return new Promise(res=>{
-        const t0=performance.now();
-        (function step(t){
-          const k=Math.min(1,(t-t0)/dur);
-          aud.volume = 0.0 + k*0.7;
-          if(k<1) requestAnimationFrame(step); else res();
-        })(t0);
+      aud.volume=0;
+      const p = aud.play(); // debe dispararse por gesto del usuario
+      return Promise.resolve(p).then(()=>{
+        return new Promise(res=>{
+          const t0=performance.now();
+          (function step(t){
+            const k=Math.min(1,(t-t0)/dur);
+            aud.volume = 0.0 + k*0.7;
+            if(k<1) requestAnimationFrame(step); else res();
+          })(performance.now());
+        });
       });
     }
     function fadeOut(aud, dur=600){
@@ -331,7 +374,7 @@
           const k=Math.min(1,(t-t0)/dur);
           aud.volume = Math.max(0, v0*(1-k));
           if(k<1) requestAnimationFrame(step); else { aud.pause(); aud.currentTime=0; res(); }
-        })(t0);
+        })(performance.now());
       });
     }
 
@@ -368,7 +411,14 @@
       if(!typing.active) return;
 
       if(!bodyEl.lastElementChild || bodyEl.lastElementChild.dataset.done==='1'){
-        if(typing.p >= PARS.length){ typing.active=false; footerEl.classList.add('show'); return; }
+        if(typing.p >= PARS.length){
+          typing.active=false;
+          footerEl.classList.add('show');
+          // al mostrar el pie, habilitamos los botones de sorpresa
+          footerSurprise.style.display = "block";
+          btnSurpriseMain.style.display = "inline-block";
+          return;
+        }
         const p=document.createElement('p'); p.dataset.done='0'; p.innerHTML=''; bodyEl.appendChild(p); typing.c=0;
       }
       const p=bodyEl.lastElementChild, text=PARS[typing.p];
@@ -391,6 +441,8 @@
       stopTyping(true);
       bodyEl.innerHTML = PARS.map(t=>`<p>${t}</p>`).join('');
       footerEl.classList.add('show');
+      footerSurprise.style.display = "block";
+      btnSurpriseMain.style.display = "inline-block";
       requestAnimationFrame(()=> assessTall());
     }
 
@@ -401,18 +453,15 @@
         showAll();
         // Copia SOLO el contenido de la carta a un contenedor plano
         const letter = document.getElementById('letter');
-        // Estructura simple para evitar filtros/3D
         printRoot.innerHTML = `
           <div class="heading">${letter.querySelector('.heading').innerHTML}</div>
           <div class="body">${document.getElementById('letter-body').innerHTML}</div>
-          <div class="footer">${document.getElementById('letter-footer').innerHTML}</div>
+          <div class="footer">Con todo mi amor,<br><strong>Papá</strong></div>
         `;
-        // Pausa música/animaciones visuales
         audio.pause();
         clearHearts();
       }catch(e){
-        // Si algo falla, al menos coloca texto plano
-        printRoot.textContent = PARS.join('\n\n');
+        printRoot.textContent = PARS.join('\\n\\n');
       }
     }
   </script>
