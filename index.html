@@ -266,7 +266,7 @@
     let typing = {timer:null, p:0, c:0, active:false};
     const BASE_SPEED = 46;
 
-    /* ======= Desbloqueo de audio (una sola vez, sin cortar si ya suena) ======= */
+    /* ======= Desbloqueo de audio (una sola vez, sin dejar mute si falla) ======= */
     let audioUnlocked = false;
     const unlockEvents = ['pointerdown','touchstart','keydown'];
 
@@ -275,14 +275,23 @@
     }
     function unlockAudio(){
       if (audioUnlocked){ detachAudioUnlock(); return; }
+
+      // Si ya está sonando, solo marcar y salir.
       if (!audio.paused){ audioUnlocked = true; detachAudioUnlock(); return; }
-      audio.muted = true;
-      audio.play()
-        .then(()=>{
-          audio.pause(); audio.currentTime = 0; audio.muted = false;
-          audioUnlocked = true; detachAudioUnlock();
-        })
-        .catch(()=>{ /* si falla, se reintenta en el próximo gesto */ });
+
+      audio.muted = true; // evitar sonido al usuario en el intento
+      const p = audio.play();
+      Promise.resolve(p).then(()=>{
+        audio.pause();
+        audio.currentTime = 0;
+        audioUnlocked = true;
+        detachAudioUnlock();
+      }).catch(()=>{
+        // No marcamos como desbloqueado; se reintenta en el próximo gesto.
+      }).finally(()=>{
+        // **FIX**: nunca dejamos el audio muteado si falló.
+        audio.muted = false;
+      });
     }
     unlockEvents.forEach(ev => window.addEventListener(ev, unlockAudio, {passive:true}));
 
@@ -310,7 +319,7 @@
       }
     });
 
-    // Eliminado el atajo de teclado para evitar cierres accidentales
+    // (Sin atajos de teclado para evitar acciones accidentales)
 
     // Si el usuario imprime desde el menú/Ctrl+P
     window.addEventListener('beforeprint', prepareForPrint);
