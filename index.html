@@ -266,20 +266,25 @@
     let typing = {timer:null, p:0, c:0, active:false};
     const BASE_SPEED = 46;
 
-    /* ======= Desbloqueo de audio para GitHub Pages / móviles =======
-       Política de autoplay: reproducir solo tras un gesto del usuario.
-       Este bloque asegura un "unlock" fiable en el PRIMER gesto. */
+    /* ======= Desbloqueo de audio (una sola vez, sin cortar si ya suena) ======= */
     let audioUnlocked = false;
-    function unlockAudioOnce(){
-      if(audioUnlocked) return;
-      audio.play().then(()=>{
-        audio.pause(); audio.currentTime = 0;
-        audioUnlocked = true;
-      }).catch(()=>{/* si falla, lo volveremos a intentar en el próximo gesto */});
+    const unlockEvents = ['pointerdown','touchstart','keydown'];
+
+    function detachAudioUnlock(){
+      unlockEvents.forEach(ev => window.removeEventListener(ev, unlockAudio, {passive:true}));
     }
-    ['pointerdown','touchstart','keydown'].forEach(evt=>{
-      window.addEventListener(evt, unlockAudioOnce, { once:false, passive:true });
-    });
+    function unlockAudio(){
+      if (audioUnlocked){ detachAudioUnlock(); return; }
+      if (!audio.paused){ audioUnlocked = true; detachAudioUnlock(); return; }
+      audio.muted = true;
+      audio.play()
+        .then(()=>{
+          audio.pause(); audio.currentTime = 0; audio.muted = false;
+          audioUnlocked = true; detachAudioUnlock();
+        })
+        .catch(()=>{ /* si falla, se reintenta en el próximo gesto */ });
+    }
+    unlockEvents.forEach(ev => window.addEventListener(ev, unlockAudio, {passive:true}));
 
     /* ======= Botones ======= */
     btnOpen.addEventListener('click', openEnv);
@@ -305,13 +310,7 @@
       }
     });
 
-    /* Teclado */
-    document.addEventListener('keydown', e=>{
-      if(e.key==='Enter' || e.key===' '){
-        if(!env.classList.contains('open')) openEnv();
-        else closeEnv();
-      }
-    });
+    // Eliminado el atajo de teclado para evitar cierres accidentales
 
     // Si el usuario imprime desde el menú/Ctrl+P
     window.addEventListener('beforeprint', prepareForPrint);
@@ -322,7 +321,6 @@
       requestAnimationFrame(()=> assessTall());
       startTyping();
       burstHearts();
-      // iniciar música tras la interacción de clic (cumple política)
       fadeIn(audio).then(()=>{
         btnMusic.textContent="⏸️ Música";
         noteEl.textContent="";
@@ -353,15 +351,16 @@
     }
 
     function fadeIn(aud, dur=800){
-      aud.volume=0;
-      const p = aud.play(); // debe dispararse por gesto del usuario
+      if (!aud.paused) return Promise.resolve(); // ya está sonando
+      aud.volume = 0;
+      const p = aud.play(); // debe dispararse tras un gesto del usuario
       return Promise.resolve(p).then(()=>{
         return new Promise(res=>{
-          const t0=performance.now();
+          const t0 = performance.now();
           (function step(t){
-            const k=Math.min(1,(t-t0)/dur);
+            const k = Math.min(1,(t - t0)/dur);
             aud.volume = 0.0 + k*0.7;
-            if(k<1) requestAnimationFrame(step); else res();
+            if (k < 1) requestAnimationFrame(step); else res();
           })(performance.now());
         });
       });
@@ -414,7 +413,6 @@
         if(typing.p >= PARS.length){
           typing.active=false;
           footerEl.classList.add('show');
-          // al mostrar el pie, habilitamos los botones de sorpresa
           footerSurprise.style.display = "block";
           btnSurpriseMain.style.display = "inline-block";
           return;
@@ -449,9 +447,7 @@
     /* ======= Impresión segura (plana) ======= */
     function prepareForPrint(){
       try{
-        // Asegura que todo el texto esté en el DOM
-        showAll();
-        // Copia SOLO el contenido de la carta a un contenedor plano
+        showAll(); // asegura que todo esté en el DOM
         const letter = document.getElementById('letter');
         printRoot.innerHTML = `
           <div class="heading">${letter.querySelector('.heading').innerHTML}</div>
